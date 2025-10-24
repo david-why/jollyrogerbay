@@ -1,18 +1,4 @@
 namespace Slack.Events {
-  namespace Events {
-    interface AppMention {
-      user: string
-      type: 'app_mention'
-      ts: string
-      client_msg_id: string
-      text: string
-      team: string
-      blocks: Slack.BlockKit.Block[]
-      channel: string
-      event_ts: string
-    }
-  }
-
   interface URLVerificationRequest {
     token: string
     challenge: string
@@ -33,5 +19,5 @@ namespace Slack.Events {
   }
 
   type Request = URLVerificationRequest | EventCallbackRequest
-  type Event = Events.AppMention
+  type Event = import('@slack/web-api').SlackEvent
 }
