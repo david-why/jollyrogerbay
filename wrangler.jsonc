@@ -13,7 +13,18 @@
 	],
 	"observability": {
 		"enabled": true
-	}
+	},
+	"triggers": {
+		"crons": [
+			"* * * * *"
+		]
+	},
+	"kv_namespaces": [
+		{
+			"binding": "KV",
+			"id": "7253c03465934a148fef13a6d2f0a725"
+		}
+	]
 	/**
 	 * Smart Placement
 	 * Docs: https://developers.cloudflare.com/workers/configuration/smart-placement/#smart-placement
