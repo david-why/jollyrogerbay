@@ -2,23 +2,99 @@ import { Hono, type Context } from 'hono'
 import { WebClient } from '@slack/web-api'
 import type { AppMentionEvent, SlackEvent } from '@slack/web-api'
 
+const { SLACK_BOT_TOKEN, SLACK_BOT_USER_ID, SLACK_USER_TOKEN, SLACK_OWNER } =
+  process.env
+
 interface HonoEnv {
   Bindings: Env
 }
 
-function getSlack(env: Env) {
-  return new WebClient(env.SLACK_BOT_TOKEN)
+function getSlack() {
+  return new WebClient(SLACK_BOT_TOKEN)
 }
 
 // specific handlers
 
 async function onAppMention(c: Context<HonoEnv>, event: AppMentionEvent) {
-  const slack = getSlack(c.env)
-  await slack.reactions.add({
-    channel: event.channel,
-    name: 'question',
-    timestamp: event.ts,
-  })
+  const slack = getSlack()
+  if (!event.text) return
+  if (event.user !== SLACK_OWNER) return
+  const text = event.text.replace(`<@${SLACK_BOT_USER_ID}>`, '').trim()
+  console.log(text)
+  if (text === '/del') {
+    if (event.thread_ts) {
+      await Promise.all([
+        slack.chat.delete({ channel: event.channel, ts: event.thread_ts }),
+        slack.chat.delete({
+          channel: event.channel,
+          ts: event.ts,
+          token: SLACK_USER_TOKEN,
+        }),
+      ])
+    } else {
+      await slack.chat.postEphemeral({
+        channel: event.channel,
+        user: event.user,
+        text: 'You can only delete a thread message',
+      })
+    }
+  } else if (text.startsWith('/echo ')) {
+    await Promise.all([
+      slack.chat.postMessage({
+        channel: event.channel,
+        text: text.substring(6),
+      }),
+      slack.chat.delete({
+        channel: event.channel,
+        ts: event.ts,
+        token: SLACK_USER_TOKEN,
+      }),
+    ])
+  } else if (text.startsWith('/channel ')) {
+    await Promise.all([
+      slack.chat.postMessage({
+        channel: event.channel,
+        text: '@channel ' + text.substring(6),
+        blocks: [
+          {
+            type: 'section',
+            text: {
+              type: 'mrkdwn',
+              text: '<!channel|> ' + text.substring(9),
+            },
+          },
+        ],
+        token: SLACK_USER_TOKEN,
+      }),
+      slack.chat.delete({
+        channel: event.channel,
+        ts: event.ts,
+        token: SLACK_USER_TOKEN,
+      }),
+    ])
+  } else if (text.startsWith('/here ')) {
+    await Promise.all([
+      slack.chat.postMessage({
+        channel: event.channel,
+        text: '@here ' + text.substring(6),
+        blocks: [
+          {
+            type: 'section',
+            text: {
+              type: 'mrkdwn',
+              text: '<!here|> ' + text.substring(6),
+            },
+          },
+        ],
+        token: SLACK_USER_TOKEN,
+      }),
+      slack.chat.delete({
+        channel: event.channel,
+        ts: event.ts,
+        token: SLACK_USER_TOKEN,
+      }),
+    ])
+  }
 }
 
 async function checkSteamGame(env: Env) {
@@ -32,7 +108,7 @@ async function checkSteamGame(env: Env) {
   const prevGameId = await env.KV.get('prev-game-id')
   const gameid = player.gameid || null
   if (prevGameId !== gameid) {
-    const slack = getSlack(env)
+    const slack = getSlack()
     let text = ''
     if (gameid) {
       const gameName = player.gameextrainfo || 'Unknown game'
@@ -44,7 +120,11 @@ async function checkSteamGame(env: Env) {
       channel: env.SLACK_CHANNEL,
       text,
     })
-    await env.KV.put('prev-game-id', gameid)
+    if (gameid) {
+      await env.KV.put('prev-game-id', gameid)
+    } else {
+      await env.KV.delete('prev-game-id')
+    }
   }
 }
 
