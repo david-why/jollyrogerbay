@@ -1,0 +1,78 @@
+{
+  "display_information": {
+    "name": "jollyrogerbay",
+    "description": "@jollyroger182's bay",
+    "background_color": "#004492"
+  },
+  "features": {
+    "bot_user": {
+      "display_name": "jollyrogerbay",
+      "always_online": true
+    }
+  },
+  "oauth_config": {
+    "redirect_urls": ["https://localhost:16483"],
+    "scopes": {
+      "user": [
+        "dnd:read",
+        "dnd:write",
+        "users.profile:read",
+        "users.profile:write",
+        "chat:write"
+      ],
+      "bot": [
+        "app_mentions:read",
+        "canvases:read",
+        "channels:history",
+        "channels:join",
+        "channels:manage",
+        "channels:read",
+        "channels:write.invites",
+        "channels:write.topic",
+        "chat:write",
+        "chat:write.customize",
+        "chat:write.public",
+        "dnd:read",
+        "emoji:read",
+        "files:read",
+        "files:write",
+        "groups:history",
+        "groups:read",
+        "groups:write",
+        "groups:write.invites",
+        "groups:write.topic",
+        "im:history",
+        "im:read",
+        "im:write",
+        "im:write.topic",
+        "metadata.message:read",
+        "mpim:history",
+        "mpim:read",
+        "mpim:write",
+        "mpim:write.topic",
+        "pins:read",
+        "pins:write",
+        "reactions:read",
+        "reactions:write",
+        "usergroups:read",
+        "usergroups:write",
+        "users.profile:read",
+        "users:read",
+        "users:read.email",
+        "users:write",
+        "commands",
+        "links:read",
+        "links:write"
+      ]
+    }
+  },
+  "settings": {
+    "event_subscriptions": {
+      "request_url": "https://jollyrogerbay-switch.davidwhy.me/redir/slack/events",
+      "bot_events": ["app_mention"]
+    },
+    "org_deploy_enabled": false,
+    "socket_mode_enabled": false,
+    "token_rotation_enabled": false
+  }
+}
