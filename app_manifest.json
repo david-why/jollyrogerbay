@@ -106,6 +106,50 @@
           "name": "outnum"
         }
       }
+    },
+    "user-channel-ping": {
+      "title": "Channel ping with user token",
+      "description": "@channel but with your user token",
+      "input_parameters": {
+        "channel": {
+          "type": "slack#/types/channel_id",
+          "title": "Channel",
+          "description": "Which channel to ping",
+          "is_required": true,
+          "name": "channel"
+        },
+        "content": {
+          "type": "slack#/types/rich_text",
+          "title": "Content",
+          "description": "Optional message content",
+          "is_required": false,
+          "hint": "What to say after the @channel",
+          "name": "content"
+        }
+      },
+      "output_parameters": {}
+    },
+    "user-here-ping": {
+      "title": "Here ping with user token",
+      "description": "@here but with your user token",
+      "input_parameters": {
+        "channel": {
+          "type": "slack#/types/channel_id",
+          "title": "Channel",
+          "description": "Which channel to ping",
+          "is_required": true,
+          "name": "channel"
+        },
+        "content": {
+          "type": "slack#/types/rich_text",
+          "title": "Content",
+          "description": "Optional message content",
+          "is_required": false,
+          "hint": "What to say after the @here",
+          "name": "content"
+        }
+      },
+      "output_parameters": {}
     }
   }
 }

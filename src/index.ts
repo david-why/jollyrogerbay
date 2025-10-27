@@ -2,6 +2,7 @@ import { Hono, type Context } from 'hono'
 import { WebClient } from '@slack/web-api'
 import type {
   AppMentionEvent,
+  Block,
   FunctionExecutedEvent,
   MemberJoinedChannelEvent,
   MemberLeftChannelEvent,
@@ -121,6 +122,28 @@ async function testStep(event: FunctionExecutedEvent) {
   })
 }
 
+async function userChannelPingStep(event: FunctionExecutedEvent) {
+  const channel = event.inputs['channel'] as string
+  const blocks = event.inputs['content'] as Block[]
+  await broadcastMessage({ channel }, '', 'channel', blocks)
+  const slack = getSlack()
+  await slack.functions.completeSuccess({
+    function_execution_id: event.function_execution_id,
+    outputs: {},
+  })
+}
+
+async function userHerePingStep(event: FunctionExecutedEvent) {
+  const channel = event.inputs['channel'] as string
+  const blocks = event.inputs['content'] as Block[]
+  await broadcastMessage({ channel }, '', 'here', blocks)
+  const slack = getSlack()
+  await slack.functions.completeSuccess({
+    function_execution_id: event.function_execution_id,
+    outputs: {},
+  })
+}
+
 // general handlers
 
 async function onFunctionExecuted(
@@ -131,6 +154,10 @@ async function onFunctionExecuted(
   switch (event.function.callback_id) {
     case 'test-step':
       return await testStep(event)
+    case 'user-channel-ping':
+      return await userChannelPingStep(event)
+    case 'user-here-ping':
+      return await userHerePingStep(event)
     default:
       const slack = getSlack()
       return await slack.functions.completeError({
@@ -161,9 +188,10 @@ async function handleCron(cron: string, env: Env, ctx: ExecutionContext) {
 // helpers
 
 async function broadcastMessage(
-  event: AppMentionEvent,
+  event: { channel: string; ts?: string; thread_ts?: string },
   text: string,
-  type: 'channel' | 'here'
+  type: 'channel' | 'here',
+  blocks: Block[] = []
 ) {
   const slack = getSlack()
   await Promise.all([
@@ -179,14 +207,17 @@ async function broadcastMessage(
             text: `<!${type}|> ${text.substring(type.length + 2)}`,
           },
         },
+        ...blocks,
       ],
       token: SLACK_USER_TOKEN,
     }),
-    slack.chat.delete({
-      channel: event.channel,
-      ts: event.ts,
-      token: SLACK_USER_TOKEN,
-    }),
+    event.ts
+      ? slack.chat.delete({
+          channel: event.channel,
+          ts: event.ts,
+          token: SLACK_USER_TOKEN,
+        })
+      : null,
   ])
 }
 
