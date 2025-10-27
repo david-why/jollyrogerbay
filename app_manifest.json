@@ -69,10 +69,43 @@
   "settings": {
     "event_subscriptions": {
       "request_url": "https://jollyrogerbay-switch.davidwhy.me/redir/slack/events",
-      "bot_events": ["app_mention"]
+      "bot_events": [
+        "app_mention",
+        "member_joined_channel",
+        "member_left_channel",
+        "function_executed"
+      ]
     },
-    "org_deploy_enabled": false,
+    "org_deploy_enabled": true,
     "socket_mode_enabled": false,
-    "token_rotation_enabled": false
+    "token_rotation_enabled": false,
+    "hermes_app_type": "remote",
+    "function_runtime": "remote"
+  },
+  "functions": {
+    "test-step": {
+      "title": "Test Workflow Steps",
+      "description": "What does this even do lol",
+      "input_parameters": {
+        "num": {
+          "type": "integer",
+          "title": "A Number",
+          "description": "Some number, doesn't matter",
+          "is_required": true,
+          "hint": "What's a hint?",
+          "name": "num"
+        }
+      },
+      "output_parameters": {
+        "outnum": {
+          "type": "number",
+          "title": "Output number!",
+          "description": "The output.",
+          "is_required": true,
+          "hint": "A hint again?",
+          "name": "outnum"
+        }
+      }
+    }
   }
 }
