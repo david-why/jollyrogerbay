@@ -228,6 +228,38 @@ async function handleCron(cron: string, env: Env, ctx: ExecutionContext) {
   }
 }
 
+async function handleCommand(
+  c: Context<HonoEnv>,
+  event: Slack.Commands.Request
+) {
+  if (event.command === '/jinfo') {
+    let match: RegExpMatchArray | null = null
+    if ((match = event.text.match(/<@(U[A-Z0-9]+)\|(.*)>/))) {
+      const [, userId, userName] = match
+      await fetch(event.response_url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          text: `<@${userId}>\nUser ID: ${userId}\nUser name: ${userName}`,
+        }),
+      })
+    } else if ((match = event.text.match(/<#(C[A-Z0-9]+)\|(.*)>/))) {
+      const [, channelId, channelName] = match
+      await fetch(event.response_url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          text: `<#${channelId}>\nChannel ID: ${channelId}\nChannel name: ${channelName}`,
+        }),
+      })
+    }
+  }
+}
+
 // helpers
 
 async function broadcastMessage(
@@ -359,6 +391,18 @@ app.post('/slack/events', async (c) => {
     c.executionCtx.waitUntil(handleEvent(c, payload.event))
     return c.body('')
   }
+})
+
+app.post('/slack/commands', async (c) => {
+  const payload = Object.fromEntries(
+    (await c.req.formData()).entries()
+  ) as unknown as Slack.Commands.Request
+  if (payload.token !== SLACK_VERIFICATION_TOKEN) {
+    return c.notFound()
+  }
+
+  c.executionCtx.waitUntil(handleCommand(c, payload))
+  return c.body('')
 })
 
 app.onError(async (error, c) => {
