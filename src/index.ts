@@ -11,6 +11,7 @@ import { Hono, type Context } from 'hono'
 import { transformEchoText } from './utils'
 
 const {
+  SLACK_VERIFICATION_TOKEN,
   SLACK_BOT_TOKEN,
   SLACK_BOT_USER_ID,
   SLACK_USER_TOKEN,
@@ -106,7 +107,7 @@ async function watchCommand(
   await slack.chat.postEphemeral({
     channel: event.channel,
     user: SLACK_OWNER,
-    text: `started watching <@${userId}>!`
+    text: `started watching <@${userId}>!`,
   })
 }
 
@@ -349,7 +350,7 @@ app.get('/', async (c) => {
 
 app.post('/slack/events', async (c) => {
   const payload = (await c.req.json()) as Slack.Events.Request
-  if (payload.token !== payload.token) {
+  if (payload.token !== SLACK_VERIFICATION_TOKEN) {
     return c.notFound()
   }
   if (payload.type === 'url_verification') {
