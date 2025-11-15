@@ -1,5 +1,3 @@
-import { Hono, type Context } from 'hono'
-import { WebClient } from '@slack/web-api'
 import type {
   AppMentionEvent,
   Block,
@@ -8,6 +6,9 @@ import type {
   MemberLeftChannelEvent,
   SlackEvent,
 } from '@slack/web-api'
+import { WebClient } from '@slack/web-api'
+import { Hono, type Context } from 'hono'
+import { transformEchoText } from './utils'
 
 const {
   SLACK_BOT_TOKEN,
@@ -53,7 +54,12 @@ async function echoCommand(event: AppMentionEvent, text: string) {
     slack.chat.postMessage({
       channel: event.channel,
       thread_ts: event.thread_ts,
-      text: text.substring(6),
+      blocks: [
+        {
+          type: 'section',
+          text: { type: 'mrkdwn', text: transformEchoText(text.substring(6)) },
+        },
+      ],
     }),
     slack.chat.delete({
       channel: event.channel,
@@ -71,6 +77,39 @@ async function hereCommand(event: AppMentionEvent, text: string) {
   await broadcastMessage(event, text, 'here')
 }
 
+async function watchCommand(
+  event: AppMentionEvent,
+  text: string,
+  c: Context<HonoEnv>
+) {
+  const slack = getSlack()
+  await slack.chat.delete({
+    channel: event.channel,
+    ts: event.ts,
+    token: SLACK_USER_TOKEN,
+  })
+  const args = text.substring(6).trim()
+  const userIdMatch = args.match(/<@(U[0-9A-Z]+)>/)
+  if (!userIdMatch) {
+    await slack.chat.postEphemeral({
+      channel: event.channel,
+      user: SLACK_OWNER,
+      text: 'no user provided </3',
+    })
+    return
+  }
+  const [, userId] = userIdMatch
+  const watched =
+    (await c.env.KV.get<Record<string, string>>('watched_users', 'json')) || {}
+  watched[userId!] = 'new'
+  await c.env.KV.put('watched_users', JSON.stringify(watched))
+  await slack.chat.postEphemeral({
+    channel: event.channel,
+    user: SLACK_OWNER,
+    text: `started watching <@${userId}>!`
+  })
+}
+
 // specific handlers
 
 async function onAppMention(c: Context<HonoEnv>, event: AppMentionEvent) {
@@ -86,6 +125,8 @@ async function onAppMention(c: Context<HonoEnv>, event: AppMentionEvent) {
     await channelCommand(event, text)
   } else if (text.startsWith('/here')) {
     await hereCommand(event, text)
+  } else if (text.startsWith('/watch')) {
+    await watchCommand(event, text, c)
   }
 }
 
@@ -181,7 +222,8 @@ async function handleEvent(c: Context<HonoEnv>, event: SlackEvent) {
 
 async function handleCron(cron: string, env: Env, ctx: ExecutionContext) {
   if (cron === '* * * * *') {
-    await checkSteamGame(env)
+    ctx.waitUntil(checkSteamGame(env))
+    ctx.waitUntil(checkPresence(env, ctx))
   }
 }
 
@@ -250,6 +292,51 @@ async function checkSteamGame(env: Env) {
       await env.KV.delete('prev-game-id')
     }
   }
+}
+
+async function checkPresence(env: Env, ctx: ExecutionContext) {
+  const watched = await env.KV.get<Record<string, string>>(
+    'watched_users',
+    'json'
+  )
+  if (!watched) return
+  const changed = (
+    await Promise.all(
+      Object.entries(watched).map((v) => checkPresenceSingle(v, watched))
+    )
+  ).reduce((a, b) => a || b, false)
+  if (changed) {
+    await env.KV.put('watched_users', JSON.stringify(watched))
+  }
+}
+
+async function checkPresenceSingle(
+  [userId, lastStatus]: [string, string],
+  watched: Record<string, string>
+) {
+  const slack = getSlack()
+  try {
+    const presence =
+      (await slack.users.getPresence({ user: userId })).presence || 'unknown'
+    if (presence !== lastStatus) {
+      await slack.chat.postMessage({
+        text: `<@${userId}>'s status changed from \`${lastStatus}\` to \`${presence}\``,
+        channel: SLACK_OWNER,
+      })
+      watched[userId] = presence
+      return true
+    }
+  } catch (e) {
+    console.error(e)
+    await slack.chat.postMessage({
+      text: `Failed to update status for <@${userId}>:\n\`\`\`\n${String(
+        e
+      )}\n\`\`\``,
+      channel: SLACK_OWNER,
+    })
+    return false
+  }
+  return false
 }
 
 // structure
