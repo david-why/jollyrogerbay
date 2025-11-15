@@ -8,17 +8,30 @@
     "bot_user": {
       "display_name": "jollyrogerbay",
       "always_online": true
-    }
+    },
+    "slash_commands": [
+      {
+        "command": "/jinfo",
+        "url": "https://jollyrogerbay-switch.davidwhy.me/redir/slack/commands",
+        "description": "Gets basic info about a channel or user",
+        "usage_hint": "@user|#channel",
+        "should_escape": true
+      }
+    ]
   },
   "oauth_config": {
     "redirect_urls": ["https://localhost:16483"],
     "scopes": {
       "user": [
+        "channels:history",
+        "chat:write",
         "dnd:read",
         "dnd:write",
+        "groups:read",
+        "search:read",
+        "usergroups:read",
         "users.profile:read",
-        "users.profile:write",
-        "chat:write"
+        "users.profile:write"
       ],
       "bot": [
         "app_mentions:read",
@@ -71,9 +84,9 @@
       "request_url": "https://jollyrogerbay-switch.davidwhy.me/redir/slack/events",
       "bot_events": [
         "app_mention",
+        "function_executed",
         "member_joined_channel",
-        "member_left_channel",
-        "function_executed"
+        "member_left_channel"
       ]
     },
     "org_deploy_enabled": true,
