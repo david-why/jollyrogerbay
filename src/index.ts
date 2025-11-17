@@ -17,6 +17,7 @@ const {
   SLACK_USER_TOKEN,
   SLACK_OWNER,
   SLACK_CHANNEL,
+  HACKCLUB_AI_KEY,
 } = process.env
 
 interface HonoEnv {
@@ -111,6 +112,82 @@ async function watchCommand(
   })
 }
 
+async function unwatchCommand(
+  event: AppMentionEvent,
+  text: string,
+  c: Context<HonoEnv>
+) {
+  const slack = getSlack()
+  await slack.chat.delete({
+    channel: event.channel,
+    ts: event.ts,
+    token: SLACK_USER_TOKEN,
+  })
+  const args = text.substring(6).trim()
+  const userIdMatch = args.match(/<@(U[0-9A-Z]+)>/)
+  if (!userIdMatch) {
+    await slack.chat.postEphemeral({
+      channel: event.channel,
+      user: SLACK_OWNER,
+      text: 'no user provided </3',
+    })
+    return
+  }
+  const [, userId] = userIdMatch
+  const watched =
+    (await c.env.KV.get<Record<string, string>>('watched_users', 'json')) || {}
+  if (userId! in watched) {
+    delete watched[userId!]
+  }
+  await c.env.KV.put('watched_users', JSON.stringify(watched))
+  await slack.chat.postEphemeral({
+    channel: event.channel,
+    user: SLACK_OWNER,
+    text: `stopped watching <@${userId}>!`,
+  })
+}
+
+async function aiCommand(
+  event: AppMentionEvent,
+  text: string,
+  c: Context<HonoEnv>
+) {
+  const slack = getSlack()
+  if (!HACKCLUB_AI_KEY) {
+    return slack.chat.postEphemeral({
+      channel: event.channel,
+      thread_ts: event.thread_ts || event.ts,
+      user: SLACK_OWNER,
+      text: 'No AI API key set.',
+    })
+  }
+  const res = (await fetch(
+    'https://ai.hackclub.com/proxy/v1/chat/completions',
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${HACKCLUB_AI_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'qwen/qwen3-32b',
+        messages: [{ role: 'user', content: text }],
+      }),
+    }
+  ).then((res) => res.json())) as any
+  return slack.chat.postMessage({
+    channel: event.channel,
+    thread_ts: event.thread_ts,
+    text: res.choices[0].message.content,
+    blocks: [
+      {
+        type: 'markdown',
+        text: res.choices[0].message.content,
+      },
+    ],
+  })
+}
+
 // specific handlers
 
 async function onAppMention(c: Context<HonoEnv>, event: AppMentionEvent) {
@@ -128,6 +205,10 @@ async function onAppMention(c: Context<HonoEnv>, event: AppMentionEvent) {
     await hereCommand(event, text)
   } else if (text.startsWith('/watch')) {
     await watchCommand(event, text, c)
+  } else if (text.startsWith('/unwatch')) {
+    await unwatchCommand(event, text, c)
+  } else if (text.startsWith('/ai')) {
+    await aiCommand(event, text, c)
   }
 }
 
