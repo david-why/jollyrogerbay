@@ -12,7 +12,6 @@
     "slash_commands": [
       {
         "command": "/jinfo",
-        "url": "https://jollyrogerbay-switch.davidwhy.me/redir/slack/commands",
         "description": "Gets basic info about a channel or user",
         "usage_hint": "@user|#channel",
         "should_escape": true
@@ -31,11 +30,13 @@
         "search:read",
         "usergroups:read",
         "users.profile:read",
-        "users.profile:write"
+        "users.profile:write",
+        "usergroups:write"
       ],
       "bot": [
         "app_mentions:read",
         "canvases:read",
+        "canvases:write",
         "channels:history",
         "channels:join",
         "channels:manage",
@@ -45,6 +46,7 @@
         "chat:write",
         "chat:write.customize",
         "chat:write.public",
+        "commands",
         "dnd:read",
         "emoji:read",
         "files:read",
@@ -58,6 +60,8 @@
         "im:read",
         "im:write",
         "im:write.topic",
+        "links:read",
+        "links:write",
         "metadata.message:read",
         "mpim:history",
         "mpim:read",
@@ -73,96 +77,26 @@
         "users:read",
         "users:read.email",
         "users:write",
-        "commands",
-        "links:read",
-        "links:write"
+        "lists:read",
+        "lists:write"
       ]
     }
   },
   "settings": {
     "event_subscriptions": {
-      "request_url": "https://jollyrogerbay-switch.davidwhy.me/redir/slack/events",
       "bot_events": [
         "app_mention",
-        "function_executed",
         "member_joined_channel",
         "member_left_channel"
       ]
     },
+    "interactivity": {
+      "is_enabled": true
+    },
     "org_deploy_enabled": true,
-    "socket_mode_enabled": false,
+    "socket_mode_enabled": true,
     "token_rotation_enabled": false,
     "hermes_app_type": "remote",
     "function_runtime": "remote"
-  },
-  "functions": {
-    "test-step": {
-      "title": "Test Workflow Steps",
-      "description": "What does this even do lol",
-      "input_parameters": {
-        "num": {
-          "type": "integer",
-          "title": "A Number",
-          "description": "Some number, doesn't matter",
-          "is_required": true,
-          "hint": "What's a hint?",
-          "name": "num"
-        }
-      },
-      "output_parameters": {
-        "outnum": {
-          "type": "number",
-          "title": "Output number!",
-          "description": "The output.",
-          "is_required": true,
-          "hint": "A hint again?",
-          "name": "outnum"
-        }
-      }
-    },
-    "user-channel-ping": {
-      "title": "Channel ping with user token",
-      "description": "@channel but with your user token",
-      "input_parameters": {
-        "channel": {
-          "type": "slack#/types/channel_id",
-          "title": "Channel",
-          "description": "Which channel to ping",
-          "is_required": true,
-          "name": "channel"
-        },
-        "content": {
-          "type": "slack#/types/rich_text",
-          "title": "Content",
-          "description": "Optional message content",
-          "is_required": false,
-          "hint": "What to say after the @channel",
-          "name": "content"
-        }
-      },
-      "output_parameters": {}
-    },
-    "user-here-ping": {
-      "title": "Here ping with user token",
-      "description": "@here but with your user token",
-      "input_parameters": {
-        "channel": {
-          "type": "slack#/types/channel_id",
-          "title": "Channel",
-          "description": "Which channel to ping",
-          "is_required": true,
-          "name": "channel"
-        },
-        "content": {
-          "type": "slack#/types/rich_text",
-          "title": "Content",
-          "description": "Optional message content",
-          "is_required": false,
-          "hint": "What to say after the @here",
-          "name": "content"
-        }
-      },
-      "output_parameters": {}
-    }
   }
 }
