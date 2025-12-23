@@ -1,3 +1,4 @@
+import { App, type SlashCommand } from '@slack/bolt'
 import type {
   AppMentionEvent,
   Block,
@@ -6,26 +7,31 @@ import type {
   MemberLeftChannelEvent,
   SlackEvent,
 } from '@slack/web-api'
-import { WebClient } from '@slack/web-api'
-import { Hono, type Context } from 'hono'
+import { deleteValue, getValue, setValue } from './database/kv'
 import { transformEchoText } from './utils'
 
 const {
-  SLACK_VERIFICATION_TOKEN,
+  SLACK_SIGNING_SECRET,
   SLACK_BOT_TOKEN,
+  SLACK_APP_TOKEN,
   SLACK_BOT_USER_ID,
   SLACK_USER_TOKEN,
   SLACK_OWNER,
-  SLACK_CHANNEL,
+  SLACK_T1_CHANNEL,
   HACKCLUB_AI_KEY,
+  STEAM_API_KEY,
+  STEAM_USER_ID,
 } = process.env
 
-interface HonoEnv {
-  Bindings: Env
-}
+const app = new App({
+  signingSecret: SLACK_SIGNING_SECRET,
+  appToken: SLACK_APP_TOKEN,
+  token: SLACK_BOT_TOKEN,
+  socketMode: true,
+})
 
 function getSlack() {
-  return new WebClient(SLACK_BOT_TOKEN)
+  return app.client
 }
 
 // "slash commands"
@@ -79,13 +85,8 @@ async function hereCommand(event: AppMentionEvent, text: string) {
   await broadcastMessage(event, text, 'here')
 }
 
-async function watchCommand(
-  event: AppMentionEvent,
-  text: string,
-  c: Context<HonoEnv>
-) {
-  const slack = getSlack()
-  await slack.chat.delete({
+async function watchCommand(event: AppMentionEvent, text: string) {
+  await app.client.chat.delete({
     channel: event.channel,
     ts: event.ts,
     token: SLACK_USER_TOKEN,
@@ -93,7 +94,7 @@ async function watchCommand(
   const args = text.substring(6).trim()
   const userIdMatch = args.match(/<@(U[0-9A-Z]+)>/)
   if (!userIdMatch) {
-    await slack.chat.postEphemeral({
+    await app.client.chat.postEphemeral({
       channel: event.channel,
       user: SLACK_OWNER,
       text: 'no user provided </3',
@@ -102,21 +103,17 @@ async function watchCommand(
   }
   const [, userId] = userIdMatch
   const watched =
-    (await c.env.KV.get<Record<string, string>>('watched_users', 'json')) || {}
+    (await getValue<Record<string, string>>('watched_users')) || {}
   watched[userId!] = 'new'
-  await c.env.KV.put('watched_users', JSON.stringify(watched))
-  await slack.chat.postEphemeral({
+  await setValue('watched_users', watched)
+  await app.client.chat.postEphemeral({
     channel: event.channel,
     user: SLACK_OWNER,
     text: `started watching <@${userId}>!`,
   })
 }
 
-async function unwatchCommand(
-  event: AppMentionEvent,
-  text: string,
-  c: Context<HonoEnv>
-) {
+async function unwatchCommand(event: AppMentionEvent, text: string) {
   const slack = getSlack()
   await slack.chat.delete({
     channel: event.channel,
@@ -135,11 +132,11 @@ async function unwatchCommand(
   }
   const [, userId] = userIdMatch
   const watched =
-    (await c.env.KV.get<Record<string, string>>('watched_users', 'json')) || {}
+    (await getValue<Record<string, string>>('watched_users')) || {}
   if (userId! in watched) {
     delete watched[userId!]
   }
-  await c.env.KV.put('watched_users', JSON.stringify(watched))
+  await setValue('watched_users', watched)
   await slack.chat.postEphemeral({
     channel: event.channel,
     user: SLACK_OWNER,
@@ -147,11 +144,7 @@ async function unwatchCommand(
   })
 }
 
-async function aiCommand(
-  event: AppMentionEvent,
-  text: string,
-  c: Context<HonoEnv>
-) {
+async function aiCommand(event: AppMentionEvent, text: string) {
   const slack = getSlack()
   if (!HACKCLUB_AI_KEY) {
     return slack.chat.postEphemeral({
@@ -190,7 +183,7 @@ async function aiCommand(
 
 // specific handlers
 
-async function onAppMention(c: Context<HonoEnv>, event: AppMentionEvent) {
+async function onAppMention(event: AppMentionEvent) {
   if (!event.text) return
   if (event.user !== SLACK_OWNER) return
   const text = event.text.replace(`<@${SLACK_BOT_USER_ID}>`, '').trim()
@@ -204,31 +197,25 @@ async function onAppMention(c: Context<HonoEnv>, event: AppMentionEvent) {
   } else if (text.startsWith('/here')) {
     await hereCommand(event, text)
   } else if (text.startsWith('/watch')) {
-    await watchCommand(event, text, c)
+    await watchCommand(event, text)
   } else if (text.startsWith('/unwatch')) {
-    await unwatchCommand(event, text, c)
+    await unwatchCommand(event, text)
   } else if (text.startsWith('/ai')) {
-    await aiCommand(event, text, c)
+    await aiCommand(event, text)
   }
 }
 
-async function onMemberLeftChannel(
-  c: Context<HonoEnv>,
-  event: MemberLeftChannelEvent
-) {
-  if (event.channel !== SLACK_CHANNEL) return
+async function onMemberLeftChannel(event: MemberLeftChannelEvent) {
+  if (event.channel !== SLACK_T1_CHANNEL) return
   const slack = getSlack()
   await slack.chat.postMessage({
     channel: SLACK_OWNER,
-    text: `hey... <@${event.user}> just left <#${SLACK_CHANNEL}>.`,
+    text: `hey... <@${event.user}> just left <#${SLACK_T1_CHANNEL}>.`,
   })
 }
 
-async function onMemberJoinedChannel(
-  c: Context<HonoEnv>,
-  event: MemberJoinedChannelEvent
-) {
-  if (event.channel !== SLACK_CHANNEL) return
+async function onMemberJoinedChannel(event: MemberJoinedChannelEvent) {
+  if (event.channel !== SLACK_T1_CHANNEL) return
   const slack = getSlack()
   await slack.chat.postMessage({
     channel: event.channel,
@@ -269,10 +256,7 @@ async function userHerePingStep(event: FunctionExecutedEvent) {
 
 // general handlers
 
-async function onFunctionExecuted(
-  c: Context<HonoEnv>,
-  event: FunctionExecutedEvent
-) {
+async function onFunctionExecuted(event: FunctionExecutedEvent) {
   console.log(JSON.stringify(event, null, 2))
   switch (event.function.callback_id) {
     case 'test-step':
@@ -290,29 +274,14 @@ async function onFunctionExecuted(
   }
 }
 
-async function handleEvent(c: Context<HonoEnv>, event: SlackEvent) {
-  if (event.type === 'app_mention') {
-    await onAppMention(c, event)
-  } else if (event.type === 'member_left_channel') {
-    await onMemberLeftChannel(c, event)
-  } else if (event.type === 'member_joined_channel') {
-    await onMemberJoinedChannel(c, event)
-  } else if (event.type === 'function_executed') {
-    await onFunctionExecuted(c, event)
-  }
-}
-
-async function handleCron(cron: string, env: Env, ctx: ExecutionContext) {
+async function handleCron(cron: string) {
   if (cron === '* * * * *') {
-    ctx.waitUntil(checkSteamGame(env))
-    ctx.waitUntil(checkPresence(env, ctx))
+    checkSteamGame()
+    checkPresence()
   }
 }
 
-async function handleCommand(
-  c: Context<HonoEnv>,
-  event: Slack.Commands.Request
-) {
+async function handleCommand(event: SlashCommand) {
   if (event.command === '/jinfo') {
     let match: RegExpMatchArray | null = null
     if ((match = event.text.match(/<@(U[A-Z0-9]+)\|(.*)>/))) {
@@ -377,42 +346,39 @@ async function broadcastMessage(
   ])
 }
 
-async function checkSteamGame(env: Env) {
+async function checkSteamGame() {
   const res = (await fetch(
-    `https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v2/?key=${env.STEAM_API_KEY}&steamids=${env.STEAM_USER_ID}`
+    `https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v2/?key=${STEAM_API_KEY}&steamids=${STEAM_USER_ID}`
   ).then((r) => r.json())) as any
   const player = res?.response?.players?.[0]
   if (!player) {
     throw new Error(`Failed to get Steam player: ${JSON.stringify(res)}`)
   }
-  const prevGameId = await env.KV.get('prev-game-id')
+  const prevGameId = await getValue('prev-game-id')
   const gameid = player.gameid || null
   if (prevGameId !== gameid) {
     const slack = getSlack()
     let text = ''
     if (gameid) {
       const gameName = player.gameextrainfo || 'Unknown game'
-      text = `<@${env.SLACK_OWNER}> is now playing: <https://store.steampowered.com/app/${gameid}/|${gameName}>!`
+      text = `<@${SLACK_OWNER}> is now playing: <https://store.steampowered.com/app/${gameid}/|${gameName}>!`
     } else {
-      text = `<@${env.SLACK_OWNER}> stopped playing games!`
+      text = `<@${SLACK_OWNER}> stopped playing games!`
     }
     await slack.chat.postMessage({
-      channel: env.SLACK_CHANNEL,
+      channel: SLACK_T1_CHANNEL,
       text,
     })
     if (gameid) {
-      await env.KV.put('prev-game-id', gameid)
+      await setValue('prev-game-id', gameid)
     } else {
-      await env.KV.delete('prev-game-id')
+      await deleteValue('prev-game-id')
     }
   }
 }
 
-async function checkPresence(env: Env, ctx: ExecutionContext) {
-  const watched = await env.KV.get<Record<string, string>>(
-    'watched_users',
-    'json'
-  )
+async function checkPresence() {
+  const watched = await getValue<Record<string, string>>('watched_users')
   if (!watched) return
   const changed = (
     await Promise.all(
@@ -420,7 +386,7 @@ async function checkPresence(env: Env, ctx: ExecutionContext) {
     )
   ).reduce((a, b) => a || b, false)
   if (changed) {
-    await env.KV.put('watched_users', JSON.stringify(watched))
+    await setValue('watched_users', watched)
   }
 }
 
@@ -453,49 +419,41 @@ async function checkPresenceSingle(
   return false
 }
 
-// structure
+// slack listeners
 
-const app = new Hono<HonoEnv>()
+setInterval(() => {
+  checkSteamGame()
+  checkPresence()
+}, 60_000)
 
-app.get('/', async (c) => {
-  return c.text('hello world')
+app.event('app_mention', async ({ payload }) => {
+  await onAppMention(payload)
 })
 
-app.post('/slack/events', async (c) => {
-  const payload = (await c.req.json()) as Slack.Events.Request
-  if (payload.token !== SLACK_VERIFICATION_TOKEN) {
-    return c.notFound()
-  }
-  if (payload.type === 'url_verification') {
-    return c.text(payload.challenge)
-  } else if (payload.type === 'event_callback') {
-    c.executionCtx.waitUntil(handleEvent(c, payload.event))
-    return c.body('')
+app.event('member_left_channel', async ({ payload }) => {
+  await onMemberLeftChannel(payload)
+})
+
+app.event('member_joined_channel', async ({ payload }) => {
+  await onMemberJoinedChannel(payload)
+})
+
+app.event('function_executed', async ({ payload }) => {
+  await onFunctionExecuted(payload)
+})
+
+app.command('/jinfo', async ({ ack, payload }) => {
+  let match: RegExpMatchArray | null = null
+  if ((match = payload.text.match(/<@(U[A-Z0-9]+)\|(.*)>/))) {
+    const [, userId, userName] = match
+    await ack(`<@${userId}>\nUser ID: ${userId}\nUser name: ${userName}`)
+  } else if ((match = payload.text.match(/<#(C[A-Z0-9]+)\|(.*)>/))) {
+    const [, channelId, channelName] = match
+    await ack(
+      `<#${channelId}>\nChannel ID: ${channelId}\nChannel name: ${channelName}`
+    )
   }
 })
 
-app.post('/slack/commands', async (c) => {
-  const payload = Object.fromEntries(
-    (await c.req.formData()).entries()
-  ) as unknown as Slack.Commands.Request
-  if (payload.token !== SLACK_VERIFICATION_TOKEN) {
-    return c.notFound()
-  }
-
-  c.executionCtx.waitUntil(handleCommand(c, payload))
-  return c.body('')
-})
-
-app.onError(async (error, c) => {
-  if (c.req.path === '/slack/events') {
-    return c.text('', 200)
-  }
-  return c.json({ error: 'internal server error' }, 500)
-})
-
-export default {
-  ...app,
-  async scheduled(controller, env, ctx) {
-    await handleCron(controller.cron, env, ctx)
-  },
-} satisfies ExportedHandler<Env>
+await app.start()
+console.log('jollyrogerbay started')
