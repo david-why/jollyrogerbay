@@ -1,5 +1,6 @@
 import type {
   AppMentionEvent,
+  KnownBlock,
   MemberJoinedChannelEvent,
   MemberLeftChannelEvent,
 } from '@slack/web-api'
@@ -23,12 +24,6 @@ const {
   STEAM_USER_ID,
 } = process.env
 
-function getSlack() {
-  return app.client
-}
-
-// "slash commands"
-
 // specific handlers
 
 async function onAppMention(event: AppMentionEvent) {
@@ -50,13 +45,29 @@ async function onAppMention(event: AppMentionEvent) {
     await unwatchCommand(event, text)
   } else if (text.startsWith('/ai')) {
     await aiCommand(event, text)
+  } else if (text.startsWith('/test')) {
+    await app.client.chat.postEphemeral({
+      channel: event.channel,
+      user: SLACK_OWNER,
+      blocks: [
+        {
+          type: 'actions',
+          elements: [
+            {
+              type: 'button',
+              text: { type: 'plain_text', text: 'click to ping' },
+              action_id: 'test_ping',
+            },
+          ],
+        },
+      ],
+    })
   }
 }
 
 async function onMemberLeftChannel(event: MemberLeftChannelEvent) {
   if (event.channel !== SLACK_T1_CHANNEL) return
-  const slack = getSlack()
-  await slack.chat.postMessage({
+  await app.client.chat.postMessage({
     channel: SLACK_OWNER,
     text: `hey... <@${event.user}> just left <#${SLACK_T1_CHANNEL}>.`,
   })
@@ -64,8 +75,7 @@ async function onMemberLeftChannel(event: MemberLeftChannelEvent) {
 
 async function onMemberJoinedChannel(event: MemberJoinedChannelEvent) {
   if (event.channel !== SLACK_T1_CHANNEL) return
-  const slack = getSlack()
-  await slack.chat.postMessage({
+  await app.client.chat.postMessage({
     channel: event.channel,
     text: `hey there <@${event.user}> welcome to my ~shithole~ channel! i yap a bit in here at random intervals.\n\n<@${SLACK_OWNER}> come out and greet them!!!`,
   })
@@ -84,7 +94,6 @@ async function checkSteamGame() {
   const prevGameId = await getValue('prev-game-id')
   const gameid = player.gameid || null
   if (prevGameId !== gameid) {
-    const slack = getSlack()
     let text = ''
     if (gameid) {
       const gameName = player.gameextrainfo || 'Unknown game'
@@ -92,7 +101,7 @@ async function checkSteamGame() {
     } else {
       text = `<@${SLACK_OWNER}> stopped playing games!`
     }
-    await slack.chat.postMessage({
+    await app.client.chat.postMessage({
       channel: SLACK_T1_CHANNEL,
       text,
     })
@@ -121,12 +130,12 @@ async function checkPresenceSingle(
   [userId, lastStatus]: [string, string],
   watched: Record<string, string>
 ) {
-  const slack = getSlack()
   try {
     const presence =
-      (await slack.users.getPresence({ user: userId })).presence || 'unknown'
+      (await app.client.users.getPresence({ user: userId })).presence ||
+      'unknown'
     if (presence !== lastStatus) {
-      await slack.chat.postMessage({
+      await app.client.chat.postMessage({
         text: `<@${userId}>'s status changed from \`${lastStatus}\` to \`${presence}\``,
         channel: SLACK_OWNER,
       })
@@ -135,7 +144,7 @@ async function checkPresenceSingle(
     }
   } catch (e) {
     console.error(e)
-    await slack.chat.postMessage({
+    await app.client.chat.postMessage({
       text: `Failed to update status for <@${userId}>:\n\`\`\`\n${String(
         e
       )}\n\`\`\``,
@@ -176,6 +185,31 @@ app.command('/jinfo', async ({ ack, payload }) => {
       `<#${channelId}>\nChannel ID: ${channelId}\nChannel name: ${channelName}`
     )
   }
+})
+
+app.action('test_ping', async ({ ack, body, payload }) => {
+  if (body.type !== 'block_actions') return
+  if (payload.type !== 'button') return
+  await ack()
+  const res = await fetch(body.response_url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      text: '@channel',
+      blocks: [
+        {
+          type: 'section',
+          text: { type: 'mrkdwn', text: '<!channel>' },
+        },
+      ] satisfies KnownBlock[],
+      replace_original: false,
+      response_type: 'in_channel',
+    }),
+  })
+  console.log(res.status)
+  console.log(await res.text())
 })
 
 await app.start()
