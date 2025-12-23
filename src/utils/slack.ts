@@ -1,13 +1,9 @@
 import type { Block } from '@slack/types'
-import app from './client'
+import app from '../client'
 
 const { SLACK_USER_TOKEN } = process.env
 
-export function transformEchoText(text: string) {
-  return text.replace('@channel', '<!channel>')
-}
-
-export async function broadcastMessage(
+export async function broadcastMessageAsUser(
   event: { channel: string; ts?: string; thread_ts?: string },
   text: string,
   type: 'channel' | 'here',

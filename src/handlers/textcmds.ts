@@ -1,7 +1,8 @@
 import type { AppMentionEvent } from '@slack/web-api'
 import app from '../client'
 import { getValue, setValue } from '../database/kv'
-import { broadcastMessage, transformEchoText } from '../utils'
+import { transformEchoText } from '../utils/text'
+import { broadcastMessageAsUser } from '../utils/slack'
 
 const { SLACK_USER_TOKEN, SLACK_OWNER, HACKCLUB_AI_KEY } = process.env
 
@@ -45,11 +46,11 @@ export async function echoCommand(event: AppMentionEvent, text: string) {
 }
 
 export async function channelCommand(event: AppMentionEvent, text: string) {
-  await broadcastMessage(event, text, 'channel')
+  await broadcastMessageAsUser(event, text, 'channel')
 }
 
 export async function hereCommand(event: AppMentionEvent, text: string) {
-  await broadcastMessage(event, text, 'here')
+  await broadcastMessageAsUser(event, text, 'here')
 }
 
 export async function watchCommand(event: AppMentionEvent, text: string) {
@@ -130,9 +131,11 @@ export async function aiCommand(event: AppMentionEvent, text: string) {
       body: JSON.stringify({
         model: 'qwen/qwen3-32b',
         messages: [{ role: 'user', content: text }],
+        max_tokens: 500,
       }),
     }
   ).then((res) => res.json())) as any
+  console.log(res)
   return app.client.chat.postMessage({
     channel: event.channel,
     thread_ts: event.thread_ts,

@@ -15,6 +15,9 @@ import {
   unwatchCommand,
   watchCommand,
 } from './handlers/textcmds'
+import { addMessageToCache, getCachedMessages } from './cache'
+import { replaceInBlocks } from './utils/blocks'
+import handlers from './handlers/text'
 
 const {
   SLACK_BOT_USER_ID,
@@ -22,6 +25,7 @@ const {
   SLACK_T1_CHANNEL,
   STEAM_API_KEY,
   STEAM_USER_ID,
+  SLACK_USER_TOKEN,
 } = process.env
 
 // specific handlers
@@ -210,6 +214,18 @@ app.action('test_ping', async ({ ack, body, payload }) => {
   })
   console.log(res.status)
   console.log(await res.text())
+})
+
+app.message(async ({ payload }) => {
+  if (payload.subtype === 'message_deleted') {
+    console.log('message deleted')
+    console.log(JSON.stringify(payload.previous_message, null, 2))
+  }
+
+  for (const handler of handlers) {
+    const res = await handler(payload)
+    if (res) break
+  }
 })
 
 await app.start()
