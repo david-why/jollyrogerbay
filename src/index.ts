@@ -212,16 +212,9 @@ app.action('test_ping', async ({ ack, body, payload }) => {
       response_type: 'in_channel',
     }),
   })
-  console.log(res.status)
-  console.log(await res.text())
 })
 
 app.message(async ({ payload }) => {
-  if (payload.subtype === 'message_deleted') {
-    console.log('message deleted')
-    console.log(JSON.stringify(payload.previous_message, null, 2))
-  }
-
   for (const handler of handlers) {
     const res = await handler(payload)
     if (res) break

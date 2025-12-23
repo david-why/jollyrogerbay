@@ -14,7 +14,6 @@ async function maybeCacheMessage(payload: MessageEvent) {
     (!payload.subtype || payload.subtype === 'file_share') &&
     payload.user === SLACK_OWNER
   ) {
-    console.log('caching message', payload.text)
     addMessageToCache(payload)
   }
 
@@ -24,11 +23,6 @@ async function maybeCacheMessage(payload: MessageEvent) {
       payload.previous_message.subtype === 'file_share') &&
     payload.previous_message.user === SLACK_OWNER
   ) {
-    console.log(
-      'deleting message',
-      payload.channel,
-      payload.previous_message.ts
-    )
     deleteMessageFromCache(payload.channel, payload.previous_message.ts)
   }
 }
