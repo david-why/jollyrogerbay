@@ -15,8 +15,6 @@ import {
   unwatchCommand,
   watchCommand,
 } from './handlers/textcmds'
-import { addMessageToCache, getCachedMessages } from './cache'
-import { replaceInBlocks } from './utils/blocks'
 import handlers from './handlers/text'
 
 const {
@@ -25,7 +23,6 @@ const {
   SLACK_T1_CHANNEL,
   STEAM_API_KEY,
   STEAM_USER_ID,
-  SLACK_USER_TOKEN,
 } = process.env
 
 // specific handlers
@@ -194,8 +191,8 @@ app.command('/jinfo', async ({ ack, payload }) => {
 app.action('test_ping', async ({ ack, body, payload }) => {
   if (body.type !== 'block_actions') return
   if (payload.type !== 'button') return
-  await ack()
-  const res = await fetch(body.response_url, {
+  ack()
+  await fetch(body.response_url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
