@@ -30,7 +30,7 @@ async function maybeCacheMessage(payload: MessageEvent) {
 }
 
 async function replaceText(payload: MessageEvent) {
-  if (payload.subtype) return
+  if (payload.subtype || payload.user !== SLACK_OWNER) return
 
   const match = payload.text?.match(/^s\/([^/]+?)\/([^/]*?)$/)
   if (!match) return
@@ -75,7 +75,7 @@ async function replaceText(payload: MessageEvent) {
 }
 
 async function sendTemplateMessage(payload: MessageEvent) {
-  if (payload.subtype !== 'me_message') return
+  if (payload.subtype !== 'me_message' || payload.user !== SLACK_OWNER) return
 
   app.client.chat.delete({
     token: SLACK_USER_TOKEN,
