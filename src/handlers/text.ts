@@ -135,7 +135,43 @@ async function sendTemplateMessage(payload: MessageEvent) {
   return true
 }
 
+async function forwardMessage(payload: MessageEvent) {
+  if (payload.subtype !== 'me_message' || payload.user !== SLACK_OWNER) return
+
+  const text = payload.text
+  const matches = [
+    ...text.matchAll(
+      /<(https?:\/\/hackclub(?:\.enterprise)?\.slack\.com\/archives\/[A-Z0-9]+\/p[0-9]+(?:\?[^ ]+)?)>/g
+    ),
+  ]
+  if (!matches.length) return
+
+  app.client.chat.delete({
+    token: SLACK_USER_TOKEN,
+    channel: payload.channel,
+    ts: payload.ts,
+  })
+
+  let newText = text
+  let suffix = ''
+  for (const match of matches) {
+    newText = newText.replace(match[0], '')
+    suffix += `<${match[1]!}| >`
+  }
+  newText += suffix
+
+  await app.client.chat.postMessage({
+    token: SLACK_USER_TOKEN,
+    channel: payload.channel,
+    thread_ts: (payload as any).thread_ts,
+    text: newText,
+  })
+
+  return true
+}
+
 const handlers: ((payload: MessageEvent) => Promise<boolean | void>)[] = [
+  forwardMessage,
   sendTemplateMessage,
   replaceText,
   // cache should probably be at the end
