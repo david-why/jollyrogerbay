@@ -85,6 +85,7 @@ async function sendTemplateMessage(payload: MessageEvent) {
 
   const text = payload.text
   let newText = text
+  let suffix = ''
 
   let userInfo: UsersInfoResponse | null = null
   const getUserInfo = async () => {
@@ -125,39 +126,13 @@ async function sendTemplateMessage(payload: MessageEvent) {
     newText = newText.replace(part, replace)
   }
 
-  await app.client.chat.postMessage({
-    token: SLACK_USER_TOKEN,
-    channel: payload.channel,
-    thread_ts: (payload as any).thread_ts,
-    text: newText,
-  })
-
-  return true
-}
-
-async function forwardMessage(payload: MessageEvent) {
-  if (payload.subtype !== 'me_message' || payload.user !== SLACK_OWNER) return
-
-  const text = payload.text
-  const matches = [
-    ...text.matchAll(
-      /<(https?:\/\/hackclub(?:\.enterprise)?\.slack\.com\/archives\/[A-Z0-9]+\/p[0-9]+(?:\?[^ ]+)?)>/g
-    ),
-  ]
-  if (!matches.length) return
-
-  app.client.chat.delete({
-    token: SLACK_USER_TOKEN,
-    channel: payload.channel,
-    ts: payload.ts,
-  })
-
-  let newText = text
-  let suffix = ''
-  for (const match of matches) {
+  for (const match of text.matchAll(
+    /<(https?:\/\/hackclub(?:\.enterprise)?\.slack\.com\/archives\/[A-Z0-9]+\/p[0-9]+(?:\?[^ ]+)?)>/g
+  )) {
     newText = newText.replace(match[0], '')
     suffix += `<${match[1]!}| >`
   }
+
   newText += suffix
 
   await app.client.chat.postMessage({
@@ -171,7 +146,6 @@ async function forwardMessage(payload: MessageEvent) {
 }
 
 const handlers: ((payload: MessageEvent) => Promise<boolean | void>)[] = [
-  forwardMessage,
   sendTemplateMessage,
   replaceText,
   // cache should probably be at the end
