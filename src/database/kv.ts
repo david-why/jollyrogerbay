@@ -21,3 +21,11 @@ export async function setValue(key: string, value: any) {
 export async function deleteValue(key: string) {
   await sql`DELETE FROM storage WHERE key = ${key}`
 }
+
+export async function getSnippets() {
+  return (await getValue<Record<string, string>>('snippets')) || {}
+}
+
+export async function setSnippets(snippets: Record<string, string>) {
+  return setValue('snippets', snippets)
+}

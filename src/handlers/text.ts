@@ -8,6 +8,7 @@ import {
 import app from '../client'
 import { replaceInBlocks } from '../utils/blocks'
 import { DateTime } from 'luxon'
+import { getSnippets } from '../database/kv'
 
 const { SLACK_OWNER, SLACK_USER_TOKEN } = process.env
 
@@ -131,6 +132,11 @@ async function sendTemplateMessage(payload: MessageEvent) {
   )) {
     newText = newText.replace(match[0], '')
     suffix += `<${match[1]!}| >`
+  }
+
+  const snippets = await getSnippets()
+  for (const [key, value] of Object.entries(snippets)) {
+    newText = newText.replaceAll(key, value)
   }
 
   newText += suffix

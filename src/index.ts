@@ -7,11 +7,14 @@ import type {
 import app from './client'
 import { deleteValue, getValue, setValue } from './database/kv'
 import {
+  addSnippetCommand,
   aiCommand,
   channelCommand,
   delCommand,
+  delSnippetCommand,
   echoCommand,
   hereCommand,
+  snippetsCommand,
   unwatchCommand,
   watchCommand,
 } from './handlers/textcmds'
@@ -46,6 +49,12 @@ async function onAppMention(event: AppMentionEvent) {
     await unwatchCommand(event, text)
   } else if (text.startsWith('/ai')) {
     await aiCommand(event, text)
+  } else if (text.startsWith('/addsnippet')) {
+    await addSnippetCommand(event, text)
+  } else if (text.startsWith('/delsnippet')) {
+    await delSnippetCommand(event, text)
+  } else if (text.startsWith('/snippets')) {
+    await snippetsCommand(event)
   } else if (text.startsWith('/test')) {
     await app.client.chat.postEphemeral({
       channel: event.channel,

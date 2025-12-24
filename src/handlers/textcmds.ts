@@ -1,10 +1,11 @@
 import type { AppMentionEvent } from '@slack/web-api'
 import app from '../client'
-import { getValue, setValue } from '../database/kv'
+import { getSnippets, getValue, setSnippets, setValue } from '../database/kv'
 import { transformEchoText } from '../utils/text'
 import { broadcastMessageAsUser } from '../utils/slack'
 
-const { SLACK_USER_TOKEN, SLACK_OWNER, HACKCLUB_AI_KEY } = process.env
+const { SLACK_USER_TOKEN, SLACK_OWNER, SLACK_BOT_USER_ID, HACKCLUB_AI_KEY } =
+  process.env
 
 export async function delCommand(event: AppMentionEvent) {
   if (event.thread_ts) {
@@ -146,5 +147,94 @@ export async function aiCommand(event: AppMentionEvent, text: string) {
         text: res.choices[0].message.content,
       },
     ],
+  })
+}
+
+export async function addSnippetCommand(event: AppMentionEvent, text: string) {
+  const [, key, ...valueParts] = text.split(' ')
+  if (!key || !valueParts.length) {
+    return app.client.chat.postEphemeral({
+      user: SLACK_OWNER,
+      channel: event.channel,
+      thread_ts: event.thread_ts,
+      text: `usage: <@${SLACK_BOT_USER_ID}> /addsnippet !key some value`,
+    })
+  }
+  const value = valueParts.join(' ')
+
+  const snippets = await getSnippets()
+  snippets[key] = value
+  await setSnippets(snippets)
+
+  await Promise.all([
+    app.client.chat.postEphemeral({
+      user: SLACK_OWNER,
+      channel: event.channel,
+      thread_ts: event.thread_ts,
+      text: `\`${key}\` added (\`${value}\`)!`,
+    }),
+    app.client.reactions.add({
+      channel: event.channel,
+      timestamp: event.ts,
+      name: 'white_check_mark',
+    }),
+  ])
+}
+
+export async function delSnippetCommand(event: AppMentionEvent, text: string) {
+  const key = text.split(' ')[1]!
+
+  const snippets = await getSnippets()
+  if (key in snippets) {
+    delete snippets[key]
+    await setSnippets(snippets)
+    await Promise.all([
+      app.client.chat.postEphemeral({
+        user: SLACK_OWNER,
+        channel: event.channel,
+        thread_ts: event.thread_ts,
+        text: `\`${key}\` removed!`,
+      }),
+      app.client.reactions.add({
+        channel: event.channel,
+        timestamp: event.ts,
+        name: 'white_check_mark',
+      }),
+    ])
+  } else {
+    await Promise.all([
+      app.client.chat.postEphemeral({
+        user: SLACK_OWNER,
+        channel: event.channel,
+        thread_ts: event.thread_ts,
+        text: `\`${key}\` not found`,
+      }),
+      app.client.reactions.add({
+        channel: event.channel,
+        timestamp: event.ts,
+        name: 'bangbang',
+      }),
+    ])
+  }
+}
+
+export async function snippetsCommand(event: AppMentionEvent) {
+  app.client.chat.delete({
+    token: SLACK_USER_TOKEN,
+    channel: event.channel,
+    ts: event.ts,
+  })
+
+  const snippets = Object.entries(await getSnippets())
+
+  const text = snippets.length
+    ? `All snippets: \n${snippets.map(([key, value]) => `- \`${key}\` (\`${value}\`)`).join('\n')}`
+    : 'There are no snippets.'
+
+  await app.client.chat.postEphemeral({
+    channel: event.channel,
+    thread_ts: event.thread_ts,
+    user: SLACK_OWNER,
+    text,
   })
 }
