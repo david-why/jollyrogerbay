@@ -1,6 +1,6 @@
 import type { MessageEvent } from '@slack/web-api'
 
-const MESSAGE_CACHE_SIZE = 1000
+const MESSAGE_CACHE_SIZE = 100
 
 // sorted by ts desc
 const messagesCache: MessageEvent[] = []
